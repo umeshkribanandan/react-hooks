@@ -1,9 +1,11 @@
-import React, { useReducer, useCallback, useMemo } from "react";
+import React, { useReducer, useCallback, useEffect, useMemo } from "react";
 
 import IngredientForm from "./IngredientForm";
 import IngredientList from "./IngredientList";
 import ErrorModal from "../UI/ErrorModal";
 import Search from "./Search";
+
+import useHttp from "../../hooks/http";
 
 const ingredientReducer = (currentIngredientsState, action) => {
   switch (action.type) {
@@ -20,91 +22,63 @@ const ingredientReducer = (currentIngredientsState, action) => {
   }
 };
 
-const httpReducer = (httpState, action) => {
-  switch (action.type) {
-    case "SEND":
-      return { loading: true, error: null };
-    case "RESPONSE":
-      return { ...httpState, loading: false };
-    case "ERROR":
-      return { loading: false, error: action.payload };
-    case "CLEAR":
-      return { loading: false, error: null };
-    default:
-      throw new Error("This option not accepted");
-  }
-};
-
 function Ingredients() {
   const [stateIngredients, dispatch] = useReducer(ingredientReducer, []);
-  const [httpState, httpDispatch] = useReducer(httpReducer, {
-    loading: false,
-    error: null,
-  });
-  //const [stateIngredients, setStateIngredients] = useState([]);
-  //const [isLoading, setisLoading] = useState(false);
-  //const [error, setError] = useState();
+  const {
+    isLoading,
+    error,
+    data,
+    sendRequest,
+    reqExtra,
+    reqIdentifier,
+    clear,
+  } = useHttp();
 
-  const submitHandler = useCallback((ingredient) => {
-    httpDispatch({ type: "SEND" });
-    fetch("https://burger-a52da.firebaseio.com/hook-ingredients.json", {
-      method: "POST",
-      body: JSON.stringify(ingredient),
-      headers: { "Content-Type": "application/json" },
-    })
-      .then((response) => {
-        return response.json();
-      })
-      .then((responseData) => {
-        httpDispatch({ type: "RESPONSE" });
-        dispatch({
-          type: "ADD",
-          payload: { id: responseData.name, ...ingredient },
-        });
-        // setStateIngredients((prevStateIngredents) => [
-        //   ...prevStateIngredents,
-        //   { id: responseData.name, ...ingredient },
-        // ]);
-      })
-      .catch((error) => {
-        httpDispatch({ type: "ERROR", payload: "Somehting went wrong!" });
-      });
-  }, []);
+  useEffect(() => {
+    if (!isLoading && !error && reqIdentifier === "DELETE_INGREDIENT") {
+      dispatch({ type: "DELETE", payload: reqExtra });
+    }
 
-  const removeHandler = useCallback((id) => {
-    httpDispatch({ type: "SEND" });
-    fetch(`https://burger-a52da.firebaseio.com/hook-ingredients/${id}.json`, {
-      method: "DELETE",
-    })
-      .then((response) => {
-        httpDispatch({ type: "RESPONSE" });
-        dispatch({
-          type: "DELETE",
-          payload: id,
-        });
-        // setStateIngredients((prevStateIngredents) => {
-        //   const tempArray = [...prevStateIngredents].filter(
-        //     (ig) => ig.id !== id
-        //   );
-        //   return tempArray;
-        // });
-      })
-      .catch((error) => {
-        httpDispatch({ type: "ERROR", payload: "Somehting went wrong!" });
+    if (!isLoading && !error && reqIdentifier === "ADD_INGREDIENT") {
+      dispatch({
+        type: "ADD",
+        payload: { id: data.name, ...reqExtra },
       });
-  }, []);
+    }
+  }, [data, reqExtra, reqIdentifier, isLoading, error]);
+
+  const submitHandler = useCallback(
+    (ingredient) => {
+      sendRequest(
+        `https://burger-a52da.firebaseio.com/hook-ingredients.json`,
+        "POST",
+        JSON.stringify(ingredient),
+        ingredient,
+        "ADD_INGREDIENT"
+      );
+    },
+    [sendRequest]
+  );
+
+  const removeHandler = useCallback(
+    (id) => {
+      sendRequest(
+        `https://burger-a52da.firebaseio.com/hook-ingredients/${id}.json`,
+        "DELETE",
+        null,
+        id,
+        "DELETE_INGREDIENT"
+      );
+    },
+    [sendRequest]
+  );
 
   const filteredIngredientsHandler = useCallback((filteredIngredients) => {
     dispatch({
       type: "SET",
       payload: filteredIngredients,
     });
-    //setStateIngredients(filteredIngredients);
   }, []);
-
-  const closeModal = useCallback(() => {
-    httpDispatch({ type: "CLEAR" });
-  });
 
   const ingredientList = useMemo(() => {
     return (
@@ -114,12 +88,11 @@ function Ingredients() {
       />
     );
   }, [stateIngredients, removeHandler]);
+
   return (
     <div className="App">
-      <IngredientForm onSubmit={submitHandler} loading={httpState.loading} />
-      {httpState.error && (
-        <ErrorModal onClose={closeModal}>{httpState.error}</ErrorModal>
-      )}
+      <IngredientForm onSubmit={submitHandler} loading={isLoading} />
+      {error && <ErrorModal onClose={clear}>{error}</ErrorModal>}
       <section>
         <Search onLoadIngredients={filteredIngredientsHandler} />
         {ingredientList}
