@@ -1,4 +1,4 @@
-import React, { useReducer, useCallback } from "react";
+import React, { useReducer, useCallback, useMemo } from "react";
 
 import IngredientForm from "./IngredientForm";
 import IngredientList from "./IngredientList";
@@ -34,6 +34,7 @@ const httpReducer = (httpState, action) => {
       throw new Error("This option not accepted");
   }
 };
+
 function Ingredients() {
   const [stateIngredients, dispatch] = useReducer(ingredientReducer, []);
   const [httpState, httpDispatch] = useReducer(httpReducer, {
@@ -44,7 +45,7 @@ function Ingredients() {
   //const [isLoading, setisLoading] = useState(false);
   //const [error, setError] = useState();
 
-  const submitHandler = (ingredient) => {
+  const submitHandler = useCallback((ingredient) => {
     httpDispatch({ type: "SEND" });
     fetch("https://burger-a52da.firebaseio.com/hook-ingredients.json", {
       method: "POST",
@@ -68,9 +69,9 @@ function Ingredients() {
       .catch((error) => {
         httpDispatch({ type: "ERROR", payload: "Somehting went wrong!" });
       });
-  };
+  }, []);
 
-  const removeHandler = (id) => {
+  const removeHandler = useCallback((id) => {
     httpDispatch({ type: "SEND" });
     fetch(`https://burger-a52da.firebaseio.com/hook-ingredients/${id}.json`, {
       method: "DELETE",
@@ -91,7 +92,7 @@ function Ingredients() {
       .catch((error) => {
         httpDispatch({ type: "ERROR", payload: "Somehting went wrong!" });
       });
-  };
+  }, []);
 
   const filteredIngredientsHandler = useCallback((filteredIngredients) => {
     dispatch({
@@ -101,9 +102,18 @@ function Ingredients() {
     //setStateIngredients(filteredIngredients);
   }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     httpDispatch({ type: "CLEAR" });
-  };
+  });
+
+  const ingredientList = useMemo(() => {
+    return (
+      <IngredientList
+        ingredients={stateIngredients}
+        onRemoveItem={removeHandler}
+      />
+    );
+  }, [stateIngredients, removeHandler]);
   return (
     <div className="App">
       <IngredientForm onSubmit={submitHandler} loading={httpState.loading} />
@@ -112,10 +122,7 @@ function Ingredients() {
       )}
       <section>
         <Search onLoadIngredients={filteredIngredientsHandler} />
-        <IngredientList
-          ingredients={stateIngredients}
-          onRemoveItem={removeHandler}
-        />
+        {ingredientList}
       </section>
     </div>
   );
