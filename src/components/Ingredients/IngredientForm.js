@@ -9,7 +9,14 @@ const IngredientForm = React.memo((props) => {
 
   const submitHandler = (event) => {
     event.preventDefault();
-    // ...
+    const ingredient = {
+      id: Math.floor(Math.random() * Math.floor(9999)),
+      title: title,
+      amount: amount,
+    };
+    setTitle("");
+    setAmount("");
+    props.onSubmit(ingredient);
   };
 
   return (
